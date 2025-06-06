@@ -1,0 +1,5 @@
+# Do not store build files
+build/*
+
+# Do not store IDE files
+.vscode/*
