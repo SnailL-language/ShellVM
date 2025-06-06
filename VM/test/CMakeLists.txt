@@ -21,7 +21,11 @@ target_link_libraries(
     reader_tests
     vm
     GTest::gtest_main
-)                     
+)
+
+add_custom_command(TARGET reader_tests PRE_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                        ${VM_SOURCE_DIR}/test/test_data/ $<TARGET_FILE_DIR:reader_tests>/test_data)
 
 include(GoogleTest)
 

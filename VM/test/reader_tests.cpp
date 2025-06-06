@@ -1,67 +1,59 @@
 #include <gtest/gtest.h>
 #include <fstream>
 #include <bitset>
+#include <iostream>
 
 #include "vm.hpp"
 
-static void test_words(const vm::Reader::word *expected, std::size_t count) {
-    fs::path test_file = "test_file.bin";
-    std::ofstream tmp(test_file, std::ios::binary);
-    tmp.write(reinterpret_cast<const char*>(expected), sizeof(uint16_t) * count);
-    tmp.close();
+using namespace vm::code;
 
-    vm::Reader reader(test_file);
+class ReaderTestFixture : public testing::Test {
+protected:
+    Reader reader;
 
-    for (size_t i = 0; i < count; ++i) {
-        vm::Reader::word word;
-        EXPECT_TRUE(reader.read_word(word)) << "Failed to read word at index " << i;
-        EXPECT_EQ(expected[i], word) << "Reader should read the correct word from the file at index " << i << "\n"
-                                     << "Expected: " << std::bitset<16>{expected[i]} << ", Got: " << std::bitset<16>{word};
+    ReaderTestFixture() : reader("test_data/example.slime") {}
+   
+    ~ReaderTestFixture() {
+        reader.close();
     }
+};
 
-    fs::remove(test_file); // Clean up
+TEST_F(ReaderTestFixture, headerTest) {
+    Header header = reader.read_header();
+    EXPECT_EQ(0x534E4131, header.magic) << "Reader should read magic number correct!";
+    EXPECT_EQ(0x0001, header.version) << "Reader should read version correct!";
+    EXPECT_EQ(0x0001, header.main_function_index) << "Reader should read main function index correct!";
 }
 
-static void test_bytes(const vm::Reader::byte *expected, std::size_t count) {
-    fs::path test_file = "test_file.bin";
-    std::ofstream tmp(test_file, std::ios::binary);
-    tmp.write(reinterpret_cast<const char*>(expected), sizeof(uint16_t) * count);
-    tmp.close();
-
-    vm::Reader reader(test_file);
-
-    vm::Reader::byte bytes[count];
-    ASSERT_EQ(count, reader.read_bytes(bytes, count)) << "Failed to read bytes";
+static void test_const(byte expected_type, byte *expected_value, byte *data) {
+    byte type = data[0];
+    EXPECT_EQ(expected_type, type);
+    std::size_t count;
+    std::size_t offset;
+    switch (type)
+    {
+    case 0x01:
+    case 0x02: {
+        count = 4;
+        offset = 1;
+        break;
+    }
+    case 0x03: {
+        count = reinterpret_cast<u16 *>(data + 1)[0];
+        offset = 3;
+    }
+    }
     for (int i = 0; i < count; ++i) {
-        EXPECT_EQ(expected[i], bytes[i]) << "Reader should read the correct bytes from the file at index " << i << "\n"
-                                        << "Expected: " << std::bitset<8>{expected[i]} << ", Got: " << std::bitset<8>{bytes[i]};
+        EXPECT_EQ(expected_value[i], data[offset + i]);
     }
-
-    fs::remove(test_file); // Clean up
 }
 
-static void test_word(vm::Reader::word expected) {
-    test_words(&expected, 1);
-}
-
-static void test_byte(vm::Reader::byte expected) {
-    test_bytes(&expected, 1);
-}
-
-TEST(ReaderTest, singleWordTest) {
-    test_word(0x1234);
-}
-
-TEST(ReaderTest, multipleWordsTest) {
-    vm::Reader::word expected[] = {0x1234, 0x5678, 0x9ABC, 0xDEF0};
-    test_words(expected, sizeof(expected) / sizeof(expected[0]));
-}
-
-TEST(ReaderTest, singleByteTest) {
-    test_byte(0xBA);
-}
-
-TEST(ReaderTest, multipleByteTest) {
-    vm::Reader::byte expected[] = {0xBA, 0x43, 0x56, 0xCE, 0x21};
-    test_bytes(expected, 5);
+TEST_F(ReaderTestFixture, constantsTest) {
+    reader.read_header();
+    ConstantPool pool = reader.read_constants();
+    ASSERT_EQ(11U, pool.size);
+    int expected[] = {0, 10, 20, 30, 40, 50, 5, 25, 2, 1, 100};
+    for (int i = 0; i < 11; ++i) {
+        test_const(0x01, reinterpret_cast<byte *>(&expected[i]), pool.data[i]);
+    }
 }
