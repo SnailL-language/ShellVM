@@ -7,15 +7,63 @@
 
 namespace fs = std::filesystem;
 
+typedef std::uint8_t byte;
+typedef std::uint16_t u16;
+typedef std::uint32_t u32;
+
 namespace vm {
     
 void proccess(const fs::path &);
 
-namespace code {
+namespace runtime {
 
-typedef std::uint8_t byte;
-typedef std::uint16_t u16;
-typedef std::uint32_t u32;
+enum class Type {
+    VOID = 0x00, 
+    I32 = 0x01, 
+    USIZE = 0x02, 
+    STRING = 0x03, 
+    ARRAY = 0x04 
+};
+
+struct Object {
+    Type type;
+    byte *data;
+    std::size_t data_size;
+    std::size_t links;
+
+    Object(Type, byte *, std::size_t);
+    Object(const Object &) = delete;
+    Object(Object &&) = delete;
+
+    Object &operator=(const Object &) = delete;
+    Object &operator=(Object &&) = delete;
+
+    bool operator==(const Object &) const;
+
+    ~Object();
+};
+
+struct Link {
+    Object *object = nullptr;
+};
+
+struct GlobalVariables {
+    u16 size;
+    Link *variables;
+
+    GlobalVariables(u16, Link *);
+    GlobalVariables(const GlobalVariables &) = delete;
+    GlobalVariables(GlobalVariables &&);
+
+    GlobalVariables &operator=(const GlobalVariables &) = delete;
+    GlobalVariables &operator=(GlobalVariables &&);
+
+    ~GlobalVariables();
+};
+
+}
+
+namespace code {
 
 class InvalidBytecodeException
 {
@@ -34,9 +82,9 @@ struct Header {
 
 struct ConstantPool {
     u16 size;
-    byte **data;
+    runtime::Object **data;
 
-    ConstantPool(u16, byte **);
+    ConstantPool(u16, runtime::Object **);
     ConstantPool(const ConstantPool &other) = delete;
     ConstantPool(ConstantPool &&other);
 
@@ -45,6 +93,49 @@ struct ConstantPool {
 
     ~ConstantPool();
 };
+
+struct Function {
+    std::size_t offset;
+    runtime::Type return_type;
+    byte arg_count;
+    u16 local_count;
+    u32 length;
+};
+
+struct FunctionTable {
+    u16 size;
+    Function *functions;
+
+    FunctionTable(u16, Function *);
+    FunctionTable(const FunctionTable &) = delete;
+    FunctionTable(FunctionTable &&other);
+
+    FunctionTable &operator=(const FunctionTable &) = delete;
+    FunctionTable &operator=(FunctionTable &&other);
+
+    ~FunctionTable();
+};
+
+struct Intrinsic {
+    runtime::Type return_type;
+    byte arg_count;
+    std::string name;
+};
+
+struct IntrinsicTable {
+    u16 size;
+    Intrinsic *functions;
+
+    IntrinsicTable(u16, Intrinsic *);
+    IntrinsicTable(const IntrinsicTable &) = delete;
+    IntrinsicTable(IntrinsicTable &&other);
+
+    IntrinsicTable &operator=(const IntrinsicTable &) = delete;
+    IntrinsicTable &operator=(IntrinsicTable &&other);
+
+    ~IntrinsicTable();
+};
+
 
 class Reader {
 public:
@@ -56,6 +147,11 @@ public:
 
     Header read_header();
     ConstantPool read_constants();
+    runtime::GlobalVariables read_globals();
+    FunctionTable read_functions();
+    IntrinsicTable read_intrinsics();
+
+    void skip(std::size_t);
 
     void close();
 
@@ -69,11 +165,14 @@ private:
     std::size_t _capacity;
     std::size_t _limit;
     std::size_t _pos;
+    std::size_t _absolute_pos;
 
     u16 read_16();
     u32 read_32();
     void read_big_endian(byte *, std::size_t);
     void read_bytes(byte *, std::size_t);
+
+    std::size_t get_offset() const;
 
     byte read_byte();
     void refill_buffer();

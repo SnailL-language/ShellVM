@@ -6,7 +6,7 @@
 using namespace vm::code;
 
 Reader::Reader(const fs::path &path)
-    : _input(path, std::ios::binary), _buffer(new byte[DEFAULT_BUFFER_SIZE]), _capacity(DEFAULT_BUFFER_SIZE), _limit(0), _pos(0)
+    : _input(path, std::ios::binary), _buffer(new byte[DEFAULT_BUFFER_SIZE]), _capacity(DEFAULT_BUFFER_SIZE), _limit(0), _pos(0), _absolute_pos(0)
 {
     if (!_input.is_open())
     {
@@ -19,7 +19,8 @@ Reader::Reader(Reader &&other)
       _buffer(other._buffer),
       _capacity(other._capacity),
       _limit(other._limit),
-      _pos(other._pos)
+      _pos(other._pos),
+      _absolute_pos(other._absolute_pos)
 {
     other._buffer = nullptr;
     other._capacity = 0;
@@ -37,11 +38,13 @@ Reader &Reader::operator=(Reader &&other)
         _capacity = other._capacity;
         _limit = other._limit;
         _pos = other._pos;
+        _absolute_pos = other._absolute_pos;
 
         other._buffer = nullptr;
         other._capacity = 0;
         other._limit = 0;
         other._pos = 0;
+        other._absolute_pos = 0;
     }
     return *this;
 }
@@ -72,16 +75,22 @@ Header Reader::read_header() {
     return {read_32(), read_16(), read_16()};
 }
 
-static void put(byte *&data, byte id, byte *value, u16 value_size)
+static vm::runtime::Type to_type(byte id)
 {
-    data = new byte[1 + value_size];
-    std::copy(&id, &id + 1, data);
-    std::copy(value, value + value_size, data + 1);
+    switch (id)
+    {
+    case 0x00: return vm::runtime::Type::VOID;
+    case 0x01: return vm::runtime::Type::I32;
+    case 0x02: return vm::runtime::Type::USIZE;
+    case 0x03: return vm::runtime::Type::STRING;
+    case 0x04: return vm::runtime::Type::ARRAY;
+    default: throw std::invalid_argument("Unknown type byte");
+    }
 }
 
 ConstantPool Reader::read_constants() {
     u16 size = read_16();
-    byte **data = new byte*[size];
+    runtime::Object **data = new runtime::Object*[size];
     for (u16 i = 0; i < size; ++i) {
         byte id = read_byte();
         switch (id)
@@ -89,7 +98,7 @@ ConstantPool Reader::read_constants() {
         case 0x01:
         case 0x02: {
             u32 value = read_32();
-            put(data[i], id, reinterpret_cast<byte *>(&value), 4);
+            data[i] = new runtime::Object(to_type(id), reinterpret_cast<byte *>(&value), 4);
             break;
         }
         case 0x03: {
@@ -97,7 +106,7 @@ ConstantPool Reader::read_constants() {
             byte *value = new byte[length + 2];
             read_bytes(value + 2, length);
             std::copy(&length, &length + 2, value);
-            put(data[i], id, value, 2 + length);
+            data[i] = new runtime::Object(to_type(id), value, length);
             break;
         }
         default:
@@ -105,6 +114,64 @@ ConstantPool Reader::read_constants() {
         }
     }
     return {size, data};
+}
+
+vm::runtime::GlobalVariables Reader::read_globals()
+{
+    u16 size = read_16();
+    vm::runtime::Link *variables = new vm::runtime::Link[size];
+    for (u16 i = 0; i < size; ++i)
+    {
+        byte name_length = read_byte();
+        skip(name_length);
+        byte id = read_byte();
+        if (id == 0x04) {
+            skip(5);
+        }
+    }   
+    return {size, variables};
+}
+
+FunctionTable vm::code::Reader::read_functions()
+{
+    u16 size = read_16();
+    Function *functions = new Function[size];
+    for (u16 i = 0; i < size; ++i) {
+        byte name_length = read_byte();
+        skip(name_length);
+        functions[i].arg_count = read_byte();
+        functions[i].return_type = to_type(read_byte());
+        functions[i].local_count = read_16();
+        functions[i].length = read_32();
+        functions[i].offset = get_offset();
+        skip(functions[i].length);
+    }
+
+    return {size, functions};
+}
+
+IntrinsicTable vm::code::Reader::read_intrinsics()
+{
+    u16 size = read_16();
+    Intrinsic *functions = new Intrinsic[size];
+    for (u16 i = 0; i < size; ++i) {
+        byte name_length = read_byte();
+        for (byte j = 0; j < name_length; ++j) {
+            functions[i].name.push_back(read_byte());
+        }
+        functions[i].arg_count = read_byte();
+        functions[i].return_type = to_type(read_byte());
+    }
+
+    return {size, functions};
+}
+
+void vm::code::Reader::skip(std::size_t delta)
+{
+    for (std::size_t i = 0; i < delta; ++i)
+    {
+        read_byte();
+    }
 }
 
 void Reader::close() {
@@ -130,6 +197,7 @@ void Reader::refill_buffer()
         return;
     }
 
+    _absolute_pos += _limit;
     _input.read(reinterpret_cast<char *>(_buffer), 8 * _capacity / CHAR_BIT);
     std::streamsize bytes_read = _input.gcount();
 
@@ -151,6 +219,11 @@ void Reader::read_bytes(byte *dest, std::size_t size)
     }
 }
 
+std::size_t vm::code::Reader::get_offset() const
+{
+    return _absolute_pos + _pos;
+}
+
 byte Reader::read_byte()
 {
     refill_buffer();
@@ -159,6 +232,5 @@ byte Reader::read_byte()
     {
         throw std::out_of_range("No more bytes to read!");
     }
-
     return _buffer[_pos++];
 }
