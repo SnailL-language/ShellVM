@@ -6,25 +6,6 @@
 
 using namespace vm::code;
 
-static void check_header(const Header &header) {
-    if (header.magic != 0x534E4131U) {
-        throw InvalidBytecodeException("Magic constant is invalid!");
-    }
-    if (header.version) {
-    }
-    if (header.main_function_index < 0) {
-        throw InvalidBytecodeException("Cannot run bytecode without a main function");
-    }
-}
-
-void vm::proccess(const fs::path &file)
-{
-    Reader reader(file);
-    Header header = reader.read_header();
-    check_header(header);
-    ConstantPool pool = reader.read_constants();
-}
-
 ConstantPool::ConstantPool(u16 size, runtime::Object **data)
     : size(size) , data(data) {}
 

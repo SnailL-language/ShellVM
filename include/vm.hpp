@@ -63,6 +63,10 @@ struct GlobalVariables {
 
 }
 
+namespace memory {
+    
+}
+
 namespace code {
 
 class InvalidBytecodeException
