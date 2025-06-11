@@ -224,6 +224,18 @@ std::size_t vm::code::Reader::get_offset() const
     return _absolute_pos + _pos;
 }
 
+void vm::code::Reader::set_offset(std::size_t pos)
+{
+    _input.seekg(pos, std::ios_base::beg);
+    refill_buffer();
+    _absolute_pos = pos;
+}
+
+vm::runtime::Type vm::code::Reader::read_type()
+{
+    return to_type(read_byte());
+}
+
 byte Reader::read_byte()
 {
     refill_buffer();

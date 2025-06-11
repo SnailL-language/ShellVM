@@ -25,5 +25,5 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    vm::proccess(target);
+    vm::process(target);
 }

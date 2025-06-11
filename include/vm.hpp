@@ -4,6 +4,7 @@
 #include <fstream>
 #include <filesystem>
 #include <cstdint>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -13,9 +14,18 @@ typedef std::uint32_t u32;
 
 namespace vm {
     
-void proccess(const fs::path &);
+void process(const fs::path &);
 
 namespace runtime {
+
+class HaltException
+{
+public: 
+    HaltException(std::string message): message{message}{}
+    std::string getMessage() const {return message;}
+private:
+    std::string message;
+};
 
 enum class Type {
     VOID = 0x00, 
@@ -40,11 +50,17 @@ struct Object {
 
     bool operator==(const Object &) const;
 
+    operator bool() const;
+
     ~Object();
 };
 
 struct Link {
     Object *object = nullptr;
+
+    Link &operator=(Object *&);
+
+    ~Link();
 };
 
 struct GlobalVariables {
@@ -64,7 +80,27 @@ struct GlobalVariables {
 }
 
 namespace memory {
-    
+
+class Allocator 
+{
+public: 
+    Allocator() = default;
+    Allocator(const Allocator &) = delete;
+    Allocator(Allocator &&) = delete;
+
+    Allocator &operator=(const Allocator &) = delete;
+    Allocator &operator=(Allocator &&) = delete;
+
+    runtime::Object *create(runtime::Type, byte *, std::size_t);
+
+    ~Allocator();
+
+private:
+    std::vector<runtime::Object *> allocated_objects;
+
+    void collect_garbage();
+};
+
 }
 
 namespace code {
@@ -155,6 +191,14 @@ public:
     FunctionTable read_functions();
     IntrinsicTable read_intrinsics();
 
+    runtime::Type read_type();
+    byte read_byte();
+    u16 read_16();
+    u32 read_32();
+
+    std::size_t get_offset() const;
+    void set_offset(std::size_t);
+
     void skip(std::size_t);
 
     void close();
@@ -171,14 +215,10 @@ private:
     std::size_t _pos;
     std::size_t _absolute_pos;
 
-    u16 read_16();
-    u32 read_32();
+    
     void read_big_endian(byte *, std::size_t);
     void read_bytes(byte *, std::size_t);
 
-    std::size_t get_offset() const;
-
-    byte read_byte();
     void refill_buffer();
 };
 

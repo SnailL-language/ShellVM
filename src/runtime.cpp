@@ -15,9 +15,34 @@ bool vm::runtime::Object::operator==(const Object &other) const
            std::equal(data, data + data_size, other.data); 
 }
 
+Object::operator bool() const {
+    for (std::size_t i = 0; i < data_size; ++i) {
+        if (data[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 Object::~Object() 
 {
     delete[] data;
+}
+
+Link &vm::runtime::Link::operator=(Object *&obj)
+{
+    if (object != nullptr) 
+        --object->links;
+
+    object = obj;
+    ++object->links;    
+}
+
+Link::~Link()
+{
+    if (object != nullptr) {
+        --object->links;
+    }
 }
 
 GlobalVariables::GlobalVariables(u16 size, Link *variables)

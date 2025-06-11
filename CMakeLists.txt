@@ -16,11 +16,11 @@ add_link_options(-fsanitize=address)
 
 enable_testing()
 
-add_library(vm src/code.cpp src/runtime.cpp src/reader.cpp src/vm.cpp)
+add_library(vm src/code.cpp src/runtime.cpp src/reader.cpp src/process.cpp)
 target_include_directories(vm PUBLIC include)
 
 add_subdirectory(test)
 
 add_executable(${PROJECT_NAME} main.cpp)
-target_include_directories(${PROJECT_NAME} PUBLIC VM/include)
+target_include_directories(${PROJECT_NAME} PUBLIC include)
 target_link_libraries(${PROJECT_NAME} PRIVATE vm)
