@@ -1,6 +1,8 @@
 #include "vm.hpp"
 #include <vector>
 #include <stack>
+#include <string>
+#include <iostream>
 
 using namespace vm;
 
@@ -18,6 +20,7 @@ static code::Header parse_header(code::Reader &reader)
     {
         throw code::InvalidBytecodeException("Cannot run bytecode without a main function");
     }
+    return header;
 }
 
 struct Environment
@@ -41,7 +44,8 @@ struct Environment
     }
 };
 
-enum Command : byte {
+enum Command : byte
+{
     PUSH_CONST = 0x01,
     PUSH_LOCAL = 0x02,
     PUSH_GLOBAL = 0x03,
@@ -52,8 +56,8 @@ enum Command : byte {
 
     ADD = 0x10,
     SUB = 0x11,
-    MUL = 0x12, 
-    DIV = 0x13, 
+    MUL = 0x12,
+    DIV = 0x13,
     MOD = 0x14,
 
     EQ = 0x20,
@@ -75,133 +79,354 @@ enum Command : byte {
 
     NEW_ARRAY = 0x40,
     GET_ARRAY = 0x41,
-    SET_ARRAY = 0x42
+    SET_ARRAY = 0x42,
+
+    INTRINSIC_CALL = 0x50
+};
+class Intrinsic
+{
+public:
+    constexpr static std::string PRINTLN = "println";
 };
 
-static void process(code::Reader &reader, Environment &env, std::size_t length, std::size_t local_count) {
+static void call_intrinsic(u16 index, Environment &env)
+{
+    if (env.intrinsics.functions[index].name == Intrinsic::PRINTLN)
+    {
+        std::cout << static_cast<std::string>(*env.stack.top()) << std::endl;
+        env.stack.pop();
+    }
+    else 
+    {
+        throw code::InvalidBytecodeException("Unsupported intrinsic function");
+    }
+}
+
+static void process(code::Reader &reader, Environment &env, std::size_t length, std::size_t local_count)
+{
     std::size_t start = reader.get_offset();
     std::vector<runtime::Link> local_variables(local_count);
-    while (reader.get_offset() - start < length) {
+    while (reader.get_offset() - start < length)
+    {
         byte command = reader.read_byte();
-        switch (command) {
+        switch (command)
+        {
         case Command::PUSH_CONST:
         {
             u16 index = reader.read_16();
             env.stack.push(env.constant_pool.data[index]);
             break;
         }
-        case Command::PUSH_LOCAL: 
+        case Command::PUSH_LOCAL:
         {
             u16 index = reader.read_16();
-            env.stack.push(local_variables[index].object); 
-            break; 
+            env.stack.push(local_variables[index].object);
+            break;
         }
-        case Command::PUSH_GLOBAL: 
+        case Command::PUSH_GLOBAL:
         {
             u16 index = reader.read_16();
-            env.stack.push(env.global.variables[index].object); 
-            break; 
+            env.stack.push(env.global.variables[index].object);
+            break;
         }
-        case Command::STORE_LOCAL: 
+        case Command::STORE_LOCAL:
         {
             u16 index = reader.read_16();
             local_variables[index] = env.stack.top();
-            env.stack.pop(); 
-            break; 
+            env.stack.pop();
+            break;
         }
-        case Command::STORE_GLOBAL: 
+        case Command::STORE_GLOBAL:
         {
             u16 index = reader.read_16();
             env.global.variables[index] = env.stack.top();
-            env.stack.pop(); 
-            break; 
+            env.stack.pop();
+            break;
         }
-        case Command::POP: 
+        case Command::POP:
         {
-            env.stack.pop(); 
-            break; 
+            env.stack.pop();
+            break;
         }
-        case Command::DUP: 
+        case Command::DUP:
         {
-            env.stack.push(env.stack.top()); 
-            break; 
+            env.stack.push(env.stack.top());
+            break;
         }
 
-        case Command::ADD: { break; }
-        case Command::SUB: { break; }
-        case Command::MUL: { break; }
-        case Command::DIV: { break; }
-        case Command::MOD: { break; }
+        case Command::ADD:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            runtime::Object *obj;
+            switch (left->type)
+            {
+            case runtime::Type::I32:
+                obj = env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(static_cast<int>(*left) + static_cast<int>(*right))), 4);
+                break;
+            case runtime::Type::USIZE:
+                obj = env.allocator.create(runtime::Type::USIZE, reinterpret_cast<byte *>(new std::size_t(static_cast<std::size_t>(*left) + static_cast<std::size_t>(*right))), sizeof(std::size_t));
+                break;
+            case runtime::Type::STRING:
+                obj = env.allocator.create(runtime::Type::STRING, reinterpret_cast<byte *>(new std::string(static_cast<std::string>(*left) + static_cast<std::string>(*right))), 4);
+                break;
+            default:
+                break;
+            }
+            env.stack.push(obj);
+            break;
+        }
+        case Command::SUB:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            runtime::Object *obj;
+            switch (left->type)
+            {
+            case runtime::Type::I32:
+                obj = env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(static_cast<int>(*left) - static_cast<int>(*right))), 4);
+                break;
+            case runtime::Type::USIZE:
+                obj = env.allocator.create(runtime::Type::USIZE, reinterpret_cast<byte *>(new std::size_t(static_cast<std::size_t>(*left) - static_cast<std::size_t>(*right))), sizeof(std::size_t));
+                break;
+            default:
+                break;
+            }
+            env.stack.push(obj);
+            break;
+        }
+        case Command::MUL:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            runtime::Object *obj;
+            switch (left->type)
+            {
+            case runtime::Type::I32:
+                obj = env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(static_cast<int>(*left) * static_cast<int>(*right))), 4);
+                break;
+            case runtime::Type::USIZE:
+                obj = env.allocator.create(runtime::Type::USIZE, reinterpret_cast<byte *>(new std::size_t(static_cast<std::size_t>(*left) * static_cast<std::size_t>(*right))), sizeof(std::size_t));
+                break;
+            default:
+                break;
+            }
+            env.stack.push(obj);
+            break;
+        }
+        case Command::DIV:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            runtime::Object *obj;
+            switch (left->type)
+            {
+            case runtime::Type::I32:
+                obj = env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(static_cast<int>(*left) / static_cast<int>(*right))), 4);
+                break;
+            case runtime::Type::USIZE:
+                obj = env.allocator.create(runtime::Type::USIZE, reinterpret_cast<byte *>(new std::size_t(static_cast<std::size_t>(*left) / static_cast<std::size_t>(*right))), sizeof(std::size_t));
+                break;
+            default:
+                break;
+            }
+            env.stack.push(obj);
+            break;
+        }
+        case Command::MOD:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            runtime::Object *obj;
+            switch (left->type)
+            {
+            case runtime::Type::I32:
+                obj = env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(static_cast<int>(*left) % static_cast<int>(*right))), 4);
+                break;
+            case runtime::Type::USIZE:
+                obj = env.allocator.create(runtime::Type::USIZE, reinterpret_cast<byte *>(new std::size_t(static_cast<std::size_t>(*left) % static_cast<std::size_t>(*right))), sizeof(std::size_t));
+                break;
+            default:
+                break;
+            }
+            env.stack.push(obj);
+            break;
+        }
 
-        case Command::EQ: { break; }
-        case Command::NEQ: { break; }
-        case Command::LT: { break; }
-        case Command::LE: { break; }
-        case Command::GT: { break; }
-        case Command::GTE: { break; }
-        case Command::AND: { break; }
-        case Command::OR: { break; }
-        case Command::NOT: { break; }
+        case Command::EQ:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left == *right
+            )), 4));
+            break;
+        }
+        case Command::NEQ:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left != *right
+            )), 4));
+            break;
+        }
+        case Command::LT:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left < *right
+            )), 4));
+            break;
+        }
+        case Command::LE:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left <= *right
+            )), 4));
+            break;
+        }
+        case Command::GT:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left > *right
+            )), 4));
+            break;
+        }
+        case Command::GTE:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                *left >= *right
+            )), 4));
+            break;
+        }
+        case Command::AND:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                static_cast<bool>(*left) && static_cast<bool>(*right)
+            )), 4));
+            break;
+        }
+        case Command::OR:
+        {
+            runtime::Object *right = env.stack.top();
+            env.stack.pop();
+            runtime::Object *left = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                static_cast<bool>(*left) || static_cast<bool>(*right)
+            )), 4));
+            break;
+        }
+        case Command::NOT:
+        {
+            runtime::Object *obj = env.stack.top();
+            env.stack.pop();
+            env.stack.push(env.allocator.create(runtime::Type::I32, reinterpret_cast<byte *>(new int(
+                !static_cast<bool>(*obj)
+            )), 4));
+            break;
+        }
 
-        case Command::JMP: 
+        case Command::JMP:
         {
             u16 length = reader.read_16();
             reader.skip(length);
-            break; 
+            break;
         }
-        case Command::JMP_IF_FALSE: 
-        { 
+        case Command::JMP_IF_FALSE:
+        {
             u16 length = reader.read_16();
             runtime::Object *condition = env.stack.top();
             env.stack.pop();
-            if (!static_cast<bool>(condition)) {
+            if (!static_cast<bool>(condition))
+            {
                 reader.skip(length);
             }
-            break; 
+            break;
         }
-        case Command::JMP_IF_TRUE: 
-        { 
+        case Command::JMP_IF_TRUE:
+        {
             u16 length = reader.read_16();
             runtime::Object *condition = env.stack.top();
             env.stack.pop();
-            if (static_cast<bool>(*condition)) {
+            if (static_cast<bool>(*condition))
+            {
                 reader.skip(length);
             }
-            break; 
+            break;
         }
-        case Command::CALL: 
-        { 
+        case Command::CALL:
+        {
             u16 index = reader.read_16();
             std::size_t current_addr = reader.get_offset();
             code::Function func = env.functions.functions[index];
             reader.set_offset(func.offset);
             process(reader, env, func.length, func.local_count + func.arg_count);
-            break; 
+            reader.set_offset(current_addr);
+            break;
         }
-        case Command::RET: { break; }
-        case Command::HALT: 
-        { 
+        case Command::RET:
+        {
+            return;
+        }
+        case Command::HALT:
+        {
             throw runtime::HaltException("HALT command found in bytecode!");
         }
 
-        case Command::NEW_ARRAY: 
-        { 
+        case Command::NEW_ARRAY:
+        {
             u16 size = reader.read_16();
-            runtime::Type type = reader.read_type();
-            env.stack.push(env.allocator.create(type, reinterpret_cast<byte *>(new runtime::Link[size]), sizeof(runtime::Link) * size));
-            break; 
+            // runtime::Type type = reader.read_type();
+            reader.skip(1U);
+            env.stack.push(env.allocator.create(runtime::Type::ARRAY, reinterpret_cast<byte *>(new runtime::Link[size]), sizeof(runtime::Link) * size));
+            break;
         }
-        case Command::GET_ARRAY: 
-        { 
+        case Command::GET_ARRAY:
+        {
             runtime::Object *array = env.stack.top();
             env.stack.pop();
             runtime::Object *index = env.stack.top();
             env.stack.pop();
             env.stack.push(reinterpret_cast<runtime::Link *>(array->data)[static_cast<std::size_t>(*index)].object);
-            break; 
+            break;
         }
-        case Command::SET_ARRAY: 
-        { 
+        case Command::SET_ARRAY:
+        {
             runtime::Object *array = env.stack.top();
             env.stack.pop();
             runtime::Object *index = env.stack.top();
@@ -209,7 +434,13 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
             runtime::Object *value = env.stack.top();
             env.stack.pop();
             reinterpret_cast<runtime::Link *>(array->data)[static_cast<std::size_t>(*index)] = value;
-            break; 
+            break;
+        }
+        case Command::INTRINSIC_CALL:
+        {
+            u16 index = reader.read_16();
+            call_intrinsic(index, env);
+            break;
         }
         }
     }
@@ -220,4 +451,5 @@ void vm::process(const fs::path &file)
     code::Reader reader(file);
     Environment env(parse_header(reader), reader.read_constants(), reader.read_globals(), reader.read_functions(), reader.read_intrinsics());
     u32 length = reader.read_32();
+    process(reader, env, length, 0);
 }

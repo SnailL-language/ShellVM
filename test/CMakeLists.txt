@@ -10,17 +10,25 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+include_directories(reader_tests PUBLIC ../include)
+link_libraries(
+    vm
+    GTest::gtest_main
+)
+
 add_executable(
     reader_tests
     reader_tests.cpp
 )
 
-target_include_directories(reader_tests PUBLIC ../include)
+add_executable(
+    object_tests
+    object_tests.cpp
+)
 
-target_link_libraries(
-    reader_tests
-    vm
-    GTest::gtest_main
+add_executable(
+    allocator_tests
+    allocator_tests.cpp
 )
 
 add_custom_command(TARGET reader_tests PRE_BUILD
@@ -30,3 +38,5 @@ add_custom_command(TARGET reader_tests PRE_BUILD
 include(GoogleTest)
 
 gtest_discover_tests(reader_tests)
+gtest_discover_tests(object_tests)
+gtest_discover_tests(allocator_tests)

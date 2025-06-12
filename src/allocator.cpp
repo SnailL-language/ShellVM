@@ -8,7 +8,13 @@ runtime::Object *memory::Allocator::create(runtime::Type type, byte *data, std::
         collect_garbage();
     }
 
-    allocated_objects.push_back(new runtime::Object(type, data, data_size));
+    runtime::Object *obj = new runtime::Object(type, data, data_size);
+    allocated_objects.push_back(obj);
+    return obj;
+}
+
+std::size_t vm::memory::Allocator::size() const {
+    return allocated_objects.size();
 }
 
 vm::memory::Allocator::~Allocator()

@@ -16,7 +16,7 @@ add_link_options(-fsanitize=address)
 
 enable_testing()
 
-add_library(vm src/code.cpp src/runtime.cpp src/reader.cpp src/process.cpp)
+add_library(vm src/code.cpp src/runtime.cpp src/reader.cpp src/allocator.cpp src/process.cpp)
 target_include_directories(vm PUBLIC include)
 
 add_subdirectory(test)

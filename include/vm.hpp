@@ -49,8 +49,17 @@ struct Object {
     Object &operator=(Object &&) = delete;
 
     bool operator==(const Object &) const;
+    bool operator!=(const Object &) const;
 
-    operator bool() const;
+    bool operator<=(const Object &) const;
+    bool operator>=(const Object &) const;
+    bool operator<(const Object &) const;
+    bool operator>(const Object &) const;
+
+    explicit operator bool() const;
+    explicit operator int() const;
+    explicit operator std::size_t() const;
+    explicit operator std::string() const;
 
     ~Object();
 };
@@ -92,6 +101,8 @@ public:
     Allocator &operator=(Allocator &&) = delete;
 
     runtime::Object *create(runtime::Type, byte *, std::size_t);
+
+    std::size_t size() const;
 
     ~Allocator();
 

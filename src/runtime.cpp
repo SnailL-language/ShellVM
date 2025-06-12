@@ -15,6 +15,45 @@ bool vm::runtime::Object::operator==(const Object &other) const
            std::equal(data, data + data_size, other.data); 
 }
 
+bool vm::runtime::Object::operator!=(const Object &other) const
+{
+    return !(*this == other);
+}
+
+bool vm::runtime::Object::operator<=(const Object &other) const
+{
+    switch(type) {
+    case runtime::Type::I32:
+        return static_cast<int>(*this) <= static_cast<int>(other);
+    case runtime::Type::USIZE:
+        return static_cast<std::size_t>(*this) <= static_cast<std::size_t>(other);
+    default:
+        return static_cast<std::string>(*this) <= static_cast<std::string>(other);
+    }
+}
+
+bool vm::runtime::Object::operator>=(const Object &other) const
+{
+    switch(type) {
+    case runtime::Type::I32:
+        return static_cast<int>(*this) >= static_cast<int>(other);
+    case runtime::Type::USIZE:
+        return static_cast<std::size_t>(*this) >= static_cast<std::size_t>(other);
+    default:
+        return static_cast<std::string>(*this) >= static_cast<std::string>(other);
+    }
+}
+
+bool vm::runtime::Object::operator<(const Object &other) const
+{
+    return !(*this >= other);
+}
+
+bool vm::runtime::Object::operator>(const Object &other) const
+{
+    return !(*this <= other);
+}
+
 Object::operator bool() const {
     for (std::size_t i = 0; i < data_size; ++i) {
         if (data[i]) {
@@ -22,6 +61,43 @@ Object::operator bool() const {
         }
     }
     return false;
+}
+
+vm::runtime::Object::operator int() const
+{
+    return reinterpret_cast<int *>(data)[0];
+}
+
+vm::runtime::Object::operator std::size_t() const
+{
+    return reinterpret_cast<std::size_t *>(data)[0];
+}
+
+vm::runtime::Object::operator std::string() const
+{
+    std::string result;
+    switch (type) 
+    {
+    case Type::I32:
+    {
+        result = std::to_string(static_cast<int>(*this));
+    }
+    case Type::USIZE:
+    {
+        result = std::to_string(static_cast<std::size_t>(*this));
+    }
+    case Type::STRING:
+    {
+        for (std::size_t i = 0; i < data_size; ++i) {
+            result.push_back(data[i]);
+        }
+    }
+    default:
+    {
+        result = std::to_string(reinterpret_cast<std::size_t>(this));
+    }
+    }
+    return result;
 }
 
 Object::~Object() 
@@ -35,7 +111,8 @@ Link &vm::runtime::Link::operator=(Object *&obj)
         --object->links;
 
     object = obj;
-    ++object->links;    
+    ++object->links;
+    return *this;    
 }
 
 Link::~Link()
