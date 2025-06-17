@@ -2,6 +2,7 @@
 #include <format>
 #include <fstream>
 #include <filesystem>
+#include <cstring>
 
 #include "vm.hpp"
 
