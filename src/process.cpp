@@ -89,7 +89,7 @@ enum Command : byte
 class Intrinsic
 {
 public:
-    constexpr static std::string PRINTLN = "println";
+    constexpr static const char *PRINTLN = "println";
 };
 
 static void call_intrinsic(u16 index, Environment &env, bool debug_mode)
