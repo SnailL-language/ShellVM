@@ -11,15 +11,19 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(VM_SOURCE_DIR ${PROJECT_SOURCE_DIR}/VM)
 
-add_compile_options(-Wall -fsanitize=address)
-add_link_options(-fsanitize=address)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug") 
+    add_compile_options(-Wall -fsanitize=address)
+    add_link_options(-fsanitize=address)
 
-enable_testing()
+    enable_testing()
+endif()
 
 add_library(vm src/code.cpp src/runtime.cpp src/reader.cpp src/allocator.cpp src/process.cpp)
 target_include_directories(vm PUBLIC include)
 
-add_subdirectory(test)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug") 
+    add_subdirectory(test)
+endif()
 
 add_executable(${PROJECT_NAME} main.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include)

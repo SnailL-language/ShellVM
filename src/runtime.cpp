@@ -2,13 +2,16 @@
 #include <iostream>
 using namespace vm::runtime;
 
-Object::Object(Type type, byte *data, std::size_t data_size) 
+Object::Object(Type type, const byte *data, std::size_t data_size)
     : type(type), data(nullptr), data_size(data_size), links(0)
 {
-    if (type == Type::ARRAY) {
+    if (type == Type::ARRAY)
+    {
         this->data = new byte[data_size * sizeof(Link)];
         new (this->data) Link[data_size];
-    } else {
+    }
+    else
+    {
         this->data = new byte[data_size];
         std::copy(data, data + data_size, this->data);
     }
@@ -16,9 +19,9 @@ Object::Object(Type type, byte *data, std::size_t data_size)
 
 bool vm::runtime::Object::operator==(const Object &other) const
 {
-    return type == other.type && 
-           data_size == other.data_size && 
-           std::equal(data, data + data_size, other.data); 
+    return type == other.type &&
+           data_size == other.data_size &&
+           std::equal(data, data + data_size, other.data);
 }
 
 bool vm::runtime::Object::operator!=(const Object &other) const
@@ -28,7 +31,8 @@ bool vm::runtime::Object::operator!=(const Object &other) const
 
 bool vm::runtime::Object::operator<=(const Object &other) const
 {
-    switch(type) {
+    switch (type)
+    {
     case runtime::Type::I32:
         return static_cast<int>(*this) <= static_cast<int>(other);
     case runtime::Type::USIZE:
@@ -40,7 +44,8 @@ bool vm::runtime::Object::operator<=(const Object &other) const
 
 bool vm::runtime::Object::operator>=(const Object &other) const
 {
-    switch(type) {
+    switch (type)
+    {
     case runtime::Type::I32:
         return static_cast<int>(*this) >= static_cast<int>(other);
     case runtime::Type::USIZE:
@@ -60,9 +65,12 @@ bool vm::runtime::Object::operator>(const Object &other) const
     return !(*this <= other);
 }
 
-Object::operator bool() const {
-    for (std::size_t i = 0; i < data_size; ++i) {
-        if (data[i]) {
+Object::operator bool() const
+{
+    for (std::size_t i = 0; i < data_size; ++i)
+    {
+        if (data[i])
+        {
             return true;
         }
     }
@@ -82,7 +90,7 @@ vm::runtime::Object::operator u32() const
 vm::runtime::Object::operator std::string() const
 {
     std::string result;
-    switch (type) 
+    switch (type)
     {
     case Type::I32:
     {
@@ -96,18 +104,19 @@ vm::runtime::Object::operator std::string() const
     }
     case Type::STRING:
     {
-        for (std::size_t i = 0; i < data_size; ++i) {
+        for (std::size_t i = 0; i < data_size; ++i)
+        {
             result.push_back(data[i]);
         }
         break;
     }
-    case Type::ARRAY: 
+    case Type::ARRAY:
     {
         result = "[";
-        for (std::size_t i = 0; i < data_size; ++i) 
+        for (std::size_t i = 0; i < data_size; ++i)
         {
             Link *links = reinterpret_cast<Link *>(data);
-            if (i > 0) 
+            if (i > 0)
                 result += ", ";
             if (links[i].object == nullptr)
             {
@@ -128,7 +137,7 @@ vm::runtime::Object::operator std::string() const
     return result;
 }
 
-Object::~Object() 
+Object::~Object()
 {
     delete[] data;
 }
@@ -138,17 +147,18 @@ vm::runtime::Link::Link()
 
 Link &vm::runtime::Link::operator=(Object *&obj)
 {
-    if (object != nullptr) 
+    if (object != nullptr)
         --object->links;
 
     object = obj;
     ++object->links;
-    return *this;    
+    return *this;
 }
 
 Link::~Link()
 {
-    if (object != nullptr) {
+    if (object != nullptr)
+    {
         --object->links;
     }
 }
@@ -164,7 +174,8 @@ vm::runtime::GlobalVariables::GlobalVariables(GlobalVariables &&other)
 
 GlobalVariables &vm::runtime::GlobalVariables::operator=(GlobalVariables &&other)
 {
-    if (this != &other) {
+    if (this != &other)
+    {
         std::swap(size, other.size);
         std::swap(variables, other.variables);
     }
@@ -173,7 +184,8 @@ GlobalVariables &vm::runtime::GlobalVariables::operator=(GlobalVariables &&other
 
 GlobalVariables::~GlobalVariables()
 {
-    if (variables != nullptr) {
+    if (variables != nullptr)
+    {
         delete[] variables;
     }
 }

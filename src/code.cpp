@@ -7,7 +7,7 @@
 using namespace vm::code;
 
 ConstantPool::ConstantPool(u16 size, runtime::Object **data)
-    : size(size) , data(data) {}
+    : size(size), data(data) {}
 
 ConstantPool::ConstantPool(ConstantPool &&other)
     : size(other.size), data(other.data)
@@ -17,7 +17,8 @@ ConstantPool::ConstantPool(ConstantPool &&other)
 
 ConstantPool &ConstantPool::operator=(ConstantPool &&other)
 {
-    if (this != &other) {
+    if (this != &other)
+    {
         std::swap(this->size, other.size);
         std::swap(this->data, other.data);
     }
@@ -26,8 +27,10 @@ ConstantPool &ConstantPool::operator=(ConstantPool &&other)
 
 ConstantPool::~ConstantPool()
 {
-    if (data != nullptr) {
-        for (int i = 0; i < size; ++i) {
+    if (data != nullptr)
+    {
+        for (int i = 0; i < size; ++i)
+        {
             delete data[i];
         }
         delete[] data;
@@ -45,7 +48,8 @@ FunctionTable::FunctionTable(FunctionTable &&other)
 
 FunctionTable &FunctionTable::operator=(FunctionTable &&other)
 {
-    if (this != &other) {
+    if (this != &other)
+    {
         std::swap(this->size, other.size);
         std::swap(this->functions, other.functions);
     }
@@ -54,7 +58,8 @@ FunctionTable &FunctionTable::operator=(FunctionTable &&other)
 
 FunctionTable::~FunctionTable()
 {
-    if (functions != nullptr) {
+    if (functions != nullptr)
+    {
         delete[] functions;
     }
 }
@@ -70,7 +75,8 @@ IntrinsicTable::IntrinsicTable(IntrinsicTable &&other)
 
 IntrinsicTable &IntrinsicTable::operator=(IntrinsicTable &&other)
 {
-    if (this != &other) {
+    if (this != &other)
+    {
         std::swap(this->size, other.size);
         std::swap(this->functions, other.functions);
     }
@@ -79,8 +85,8 @@ IntrinsicTable &IntrinsicTable::operator=(IntrinsicTable &&other)
 
 IntrinsicTable::~IntrinsicTable()
 {
-    if (functions != nullptr) {
+    if (functions != nullptr)
+    {
         delete[] functions;
     }
 }
-

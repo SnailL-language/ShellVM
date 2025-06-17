@@ -12,235 +12,249 @@ typedef std::uint8_t byte;
 typedef std::uint16_t u16;
 typedef std::uint32_t u32;
 
-namespace vm {
-    
-void process(const fs::path &, bool);
-
-namespace runtime {
-
-class HaltException
+namespace vm
 {
-public: 
-    HaltException(std::string message): message{message}{}
-    std::string getMessage() const {return message;}
-private:
-    std::string message;
-};
 
-enum Type : byte {
-    VOID = 0x00, 
-    I32 = 0x01, 
-    USIZE = 0x02, 
-    STRING = 0x03, 
-    ARRAY = 0x04 
-};
+    void process(const fs::path &, bool);
 
-struct Object {
-    Type type;
-    byte *data;
-    std::size_t data_size;
-    std::size_t links;
+    namespace runtime
+    {
 
-    Object(Type, byte *, std::size_t);
-    Object(const Object &) = delete;
-    Object(Object &&) = delete;
+        class HaltException
+        {
+        public:
+            HaltException(std::string message) : message{message} {}
+            std::string getMessage() const { return message; }
 
-    Object &operator=(const Object &) = delete;
-    Object &operator=(Object &&) = delete;
+        private:
+            std::string message;
+        };
 
-    bool operator==(const Object &) const;
-    bool operator!=(const Object &) const;
+        enum Type : byte
+        {
+            VOID = 0x00,
+            I32 = 0x01,
+            USIZE = 0x02,
+            STRING = 0x03,
+            ARRAY = 0x04
+        };
 
-    bool operator<=(const Object &) const;
-    bool operator>=(const Object &) const;
-    bool operator<(const Object &) const;
-    bool operator>(const Object &) const;
+        struct Object
+        {
+            Type type;
+            byte *data;
+            std::size_t data_size;
+            std::size_t links;
 
-    explicit operator bool() const;
-    explicit operator int() const;
-    explicit operator u32() const;
-    explicit operator std::string() const;
+            Object(Type, const byte *, std::size_t);
+            Object(const Object &) = delete;
+            Object(Object &&) = delete;
 
-    ~Object();
-};
+            Object &operator=(const Object &) = delete;
+            Object &operator=(Object &&) = delete;
 
-struct Link {
-    Object *object = nullptr;
+            bool operator==(const Object &) const;
+            bool operator!=(const Object &) const;
 
-    Link();
-    Link(const Link &) = delete;
-    Link(Link &&) = delete;
+            bool operator<=(const Object &) const;
+            bool operator>=(const Object &) const;
+            bool operator<(const Object &) const;
+            bool operator>(const Object &) const;
 
+            explicit operator bool() const;
+            explicit operator int() const;
+            explicit operator u32() const;
+            explicit operator std::string() const;
 
-    Link &operator=(const Link &) = delete;
-    Link &operator=(Link &&) = delete;
-    Link &operator=(Object *&);
+            ~Object();
+        };
 
-    ~Link();
-};
+        struct Link
+        {
+            Object *object = nullptr;
 
-struct GlobalVariables {
-    u16 size;
-    Link *variables;
+            Link();
+            Link(const Link &) = delete;
+            Link(Link &&) = delete;
 
-    GlobalVariables(u16, Link *);
-    GlobalVariables(const GlobalVariables &) = delete;
-    GlobalVariables(GlobalVariables &&);
+            Link &operator=(const Link &) = delete;
+            Link &operator=(Link &&) = delete;
+            Link &operator=(Object *&);
 
-    GlobalVariables &operator=(const GlobalVariables &) = delete;
-    GlobalVariables &operator=(GlobalVariables &&);
+            ~Link();
+        };
 
-    ~GlobalVariables();
-};
+        struct GlobalVariables
+        {
+            u16 size;
+            Link *variables;
 
-}
+            GlobalVariables(u16, Link *);
+            GlobalVariables(const GlobalVariables &) = delete;
+            GlobalVariables(GlobalVariables &&);
 
-namespace memory {
+            GlobalVariables &operator=(const GlobalVariables &) = delete;
+            GlobalVariables &operator=(GlobalVariables &&);
 
-class Allocator 
-{
-public: 
-    Allocator() = default;
-    Allocator(const Allocator &) = delete;
-    Allocator(Allocator &&) = default;
+            ~GlobalVariables();
+        };
 
-    Allocator &operator=(const Allocator &) = delete;
-    Allocator &operator=(Allocator &&) = delete;
+    }
 
-    runtime::Object *create(runtime::Type, byte *, std::size_t);
+    namespace memory
+    {
 
-    std::size_t size() const;
+        class Allocator
+        {
+        public:
+            Allocator() = default;
+            Allocator(const Allocator &) = delete;
+            Allocator(Allocator &&) = default;
 
-    ~Allocator();
+            Allocator &operator=(const Allocator &) = delete;
+            Allocator &operator=(Allocator &&) = delete;
 
-private:
-    std::vector<runtime::Object *> allocated_objects;
+            runtime::Object *create(runtime::Type, const byte *, std::size_t);
 
-    void collect_garbage();
-};
+            std::size_t size() const;
 
-}
+            ~Allocator();
 
-namespace code {
+        private:
+            std::vector<runtime::Object *> allocated_objects;
 
-class InvalidBytecodeException
-{
-public: 
-    InvalidBytecodeException(std::string message): message{message}{}
-    std::string getMessage() const {return message;}
-private:
-    std::string message;
-};
+            void collect_garbage();
+        };
 
-struct Header {
-    uint32_t magic;
-    uint16_t version;
-    uint16_t main_function_index;
-};
+    }
 
-struct ConstantPool {
-    u16 size;
-    runtime::Object **data;
+    namespace code
+    {
 
-    ConstantPool(u16, runtime::Object **);
-    ConstantPool(const ConstantPool &other) = delete;
-    ConstantPool(ConstantPool &&other);
+        class InvalidBytecodeException
+        {
+        public:
+            InvalidBytecodeException(std::string message) : message{message} {}
+            std::string getMessage() const { return message; }
 
-    ConstantPool &operator=(const ConstantPool &other) = delete;
-    ConstantPool &operator=(ConstantPool &&other);
+        private:
+            std::string message;
+        };
 
-    ~ConstantPool();
-};
+        struct Header
+        {
+            uint32_t magic;
+            uint16_t version;
+            uint16_t main_function_index;
+        };
 
-struct Function {
-    std::size_t offset;
-    runtime::Type return_type;
-    byte arg_count;
-    u16 local_count;
-    u32 length;
-};
+        struct ConstantPool
+        {
+            u16 size;
+            runtime::Object **data;
 
-struct FunctionTable {
-    u16 size;
-    Function *functions;
+            ConstantPool(u16, runtime::Object **);
+            ConstantPool(const ConstantPool &other) = delete;
+            ConstantPool(ConstantPool &&other);
 
-    FunctionTable(u16, Function *);
-    FunctionTable(const FunctionTable &) = delete;
-    FunctionTable(FunctionTable &&other);
+            ConstantPool &operator=(const ConstantPool &other) = delete;
+            ConstantPool &operator=(ConstantPool &&other);
 
-    FunctionTable &operator=(const FunctionTable &) = delete;
-    FunctionTable &operator=(FunctionTable &&other);
+            ~ConstantPool();
+        };
 
-    ~FunctionTable();
-};
+        struct Function
+        {
+            std::size_t offset;
+            runtime::Type return_type;
+            byte arg_count;
+            u16 local_count;
+            u32 length;
+        };
 
-struct Intrinsic {
-    runtime::Type return_type;
-    byte arg_count;
-    std::string name;
-};
+        struct FunctionTable
+        {
+            u16 size;
+            Function *functions;
 
-struct IntrinsicTable {
-    u16 size;
-    Intrinsic *functions;
+            FunctionTable(u16, Function *);
+            FunctionTable(const FunctionTable &) = delete;
+            FunctionTable(FunctionTable &&other);
 
-    IntrinsicTable(u16, Intrinsic *);
-    IntrinsicTable(const IntrinsicTable &) = delete;
-    IntrinsicTable(IntrinsicTable &&other);
+            FunctionTable &operator=(const FunctionTable &) = delete;
+            FunctionTable &operator=(FunctionTable &&other);
 
-    IntrinsicTable &operator=(const IntrinsicTable &) = delete;
-    IntrinsicTable &operator=(IntrinsicTable &&other);
+            ~FunctionTable();
+        };
 
-    ~IntrinsicTable();
-};
+        struct Intrinsic
+        {
+            runtime::Type return_type;
+            byte arg_count;
+            std::string name;
+        };
 
+        struct IntrinsicTable
+        {
+            u16 size;
+            Intrinsic *functions;
 
-class Reader {
-public:
-    Reader(const fs::path &);
-    Reader(const Reader &) = delete;
-    Reader(Reader &&);
-    Reader &operator=(const Reader &) = delete;
-    Reader &operator=(Reader &&);
+            IntrinsicTable(u16, Intrinsic *);
+            IntrinsicTable(const IntrinsicTable &) = delete;
+            IntrinsicTable(IntrinsicTable &&other);
 
-    Header read_header();
-    ConstantPool read_constants();
-    runtime::GlobalVariables read_globals(memory::Allocator &);
-    FunctionTable read_functions();
-    IntrinsicTable read_intrinsics();
+            IntrinsicTable &operator=(const IntrinsicTable &) = delete;
+            IntrinsicTable &operator=(IntrinsicTable &&other);
 
-    runtime::Type read_type();
-    byte read_byte();
-    u16 read_16();
-    u32 read_32();
+            ~IntrinsicTable();
+        };
 
-    std::size_t get_offset() const;
-    void set_offset(std::size_t);
+        class Reader
+        {
+        public:
+            Reader(const fs::path &);
+            Reader(const Reader &) = delete;
+            Reader(Reader &&);
+            Reader &operator=(const Reader &) = delete;
+            Reader &operator=(Reader &&);
 
-    void skip(std::size_t);
+            Header read_header();
+            ConstantPool read_constants();
+            runtime::GlobalVariables read_globals();
+            FunctionTable read_functions();
+            IntrinsicTable read_intrinsics();
 
-    void close();
+            runtime::Type read_type();
+            byte read_byte();
+            u16 read_16();
+            u32 read_32();
 
-    ~Reader();
+            std::size_t get_offset() const;
+            void set_offset(std::size_t);
 
-private:
-    constexpr static std::size_t DEFAULT_BUFFER_SIZE = 1024;
+            void skip(std::size_t);
 
-    std::ifstream _input;
-    byte *_buffer;
-    std::size_t _capacity;
-    std::size_t _limit;
-    std::size_t _pos;
-    std::size_t _absolute_pos;
+            void close();
 
-    
-    void read_big_endian(byte *, std::size_t);
-    void read_bytes(byte *, std::size_t);
+            ~Reader();
 
-    void refill_buffer();
-};
+        private:
+            constexpr static std::size_t DEFAULT_BUFFER_SIZE = 1024;
 
-}
+            std::ifstream _input;
+            byte *_buffer;
+            std::size_t _capacity;
+            std::size_t _limit;
+            std::size_t _pos;
+            std::size_t _absolute_pos;
+
+            void read_big_endian(byte *, std::size_t);
+            void read_bytes(byte *, std::size_t);
+
+            void refill_buffer();
+        };
+
+    }
 
 }
 

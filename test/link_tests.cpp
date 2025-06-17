@@ -7,11 +7,12 @@
 
 using namespace vm::runtime;
 
-static Object create_int(int value) {
+static Object create_int(int value)
+{
     return {Type::I32, reinterpret_cast<byte *>(new int(value)), 4};
 }
 
-TEST(LinkTests, creationTest) 
+TEST(LinkTests, creationTest)
 {
     Object obj = create_int(20);
     Object *point = &obj;

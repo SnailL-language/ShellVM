@@ -71,7 +71,8 @@ void vm::code::Reader::read_big_endian(byte *dest, std::size_t size)
     }
 }
 
-Header Reader::read_header() {
+Header Reader::read_header()
+{
     return {read_32(), read_16(), read_16()};
 }
 
@@ -79,31 +80,41 @@ static vm::runtime::Type to_type(byte id)
 {
     switch (id)
     {
-    case 0x00: return vm::runtime::Type::VOID;
-    case 0x01: return vm::runtime::Type::I32;
-    case 0x02: return vm::runtime::Type::USIZE;
-    case 0x03: return vm::runtime::Type::STRING;
-    case 0x04: return vm::runtime::Type::ARRAY;
-    default: throw std::invalid_argument("Unknown type byte");
+    case 0x00:
+        return vm::runtime::Type::VOID;
+    case 0x01:
+        return vm::runtime::Type::I32;
+    case 0x02:
+        return vm::runtime::Type::USIZE;
+    case 0x03:
+        return vm::runtime::Type::STRING;
+    case 0x04:
+        return vm::runtime::Type::ARRAY;
+    default:
+        throw std::invalid_argument("Unknown type byte");
     }
 }
 
-ConstantPool Reader::read_constants() {
+ConstantPool Reader::read_constants()
+{
     u16 size = read_16();
-    runtime::Object **data = new runtime::Object*[size];
-    for (u16 i = 0; i < size; ++i) {
+    runtime::Object **data = new runtime::Object *[size];
+    for (u16 i = 0; i < size; ++i)
+    {
         byte id = read_byte();
         switch (id)
         {
         case 0x01:
-        case 0x02: {
+        case 0x02:
+        {
             u32 value = read_32();
             byte *value_ptr = new byte[4];
             std::copy(reinterpret_cast<byte *>(&value), reinterpret_cast<byte *>(&value) + 4, value_ptr);
             data[i] = new runtime::Object(to_type(id), value_ptr, 4);
             break;
         }
-        case 0x03: {
+        case 0x03:
+        {
             u16 length = read_16();
             byte *value = new byte[length];
             read_bytes(value, length);
@@ -118,7 +129,7 @@ ConstantPool Reader::read_constants() {
     return {size, data};
 }
 
-vm::runtime::GlobalVariables Reader::read_globals(memory::Allocator &allocator)
+vm::runtime::GlobalVariables Reader::read_globals()
 {
     u16 size = read_16();
     vm::runtime::Link *variables = new vm::runtime::Link[size];
@@ -127,13 +138,11 @@ vm::runtime::GlobalVariables Reader::read_globals(memory::Allocator &allocator)
         byte name_length = read_byte();
         skip(name_length);
         byte id = read_byte();
-        if (id == 0x04) {
+        if (id == 0x04)
+        {
             skip(5);
-            // u32 array_size = read_32();
-            // vm::runtime::Object *array = allocator.create(runtime::Type::ARRAY, reinterpret_cast<byte *>(new runtime::Link[array_size]), array_size);
-            // variables[i] = array;
         }
-    }   
+    }
     return {size, variables};
 }
 
@@ -141,7 +150,8 @@ FunctionTable vm::code::Reader::read_functions()
 {
     u16 size = read_16();
     Function *functions = new Function[size];
-    for (u16 i = 0; i < size; ++i) {
+    for (u16 i = 0; i < size; ++i)
+    {
         byte name_length = read_byte();
         skip(name_length);
         functions[i].arg_count = read_byte();
@@ -159,9 +169,11 @@ IntrinsicTable vm::code::Reader::read_intrinsics()
 {
     u16 size = read_16();
     Intrinsic *functions = new Intrinsic[size];
-    for (u16 i = 0; i < size; ++i) {
+    for (u16 i = 0; i < size; ++i)
+    {
         byte name_length = read_byte();
-        for (byte j = 0; j < name_length; ++j) {
+        for (byte j = 0; j < name_length; ++j)
+        {
             functions[i].name.push_back(read_byte());
         }
         functions[i].arg_count = read_byte();
@@ -179,7 +191,8 @@ void vm::code::Reader::skip(std::size_t delta)
     }
 }
 
-void Reader::close() {
+void Reader::close()
+{
     if (_input.is_open())
     {
         _input.close();

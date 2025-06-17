@@ -56,11 +56,10 @@ TEST_F(ReaderTestFixture, globalsTest)
 {
     reader.read_header();
     reader.read_constants();
-    vm::memory::Allocator allocator;
-    GlobalVariables globals = reader.read_globals(allocator);
+    GlobalVariables globals = reader.read_globals();
     ASSERT_EQ(2U, globals.size);
     EXPECT_EQ(nullptr, globals.variables[0].object) << "First global variable shouldn't be initialized here!";
-    EXPECT_NE(nullptr, globals.variables[1].object) << "Array global variable should be initialized here!";
+    EXPECT_EQ(nullptr, globals.variables[1].object) << "Second global variable shouldn't be initialized here!";
 }
 
 static void test_function(const Function &function, std::size_t offset, Type return_type, byte arg_count, u16 local_count, u32 length)
@@ -76,8 +75,7 @@ TEST_F(ReaderTestFixture, functionsTest)
 {
     reader.read_header();
     reader.read_constants();
-    vm::memory::Allocator allocator;
-    reader.read_globals(allocator);
+    reader.read_globals();
     FunctionTable functions = reader.read_functions();
     ASSERT_EQ(2U, functions.size);
     test_function(functions.functions[0], 0x0000006C, Type::I32, 2, 4, 30);
@@ -95,8 +93,7 @@ TEST_F(ReaderTestFixture, intrinsicsTest)
 {
     reader.read_header();
     reader.read_constants();
-    vm::memory::Allocator allocator;
-    reader.read_globals(allocator);
+    reader.read_globals();
     reader.read_functions();
     IntrinsicTable intrinsics = reader.read_intrinsics();
     ASSERT_EQ(1U, intrinsics.size);
