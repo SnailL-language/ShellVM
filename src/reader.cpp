@@ -2,6 +2,7 @@
 #include <climits>
 #include <stdexcept>
 #include <iostream>
+#include <string>
 
 using namespace vm::code;
 
@@ -91,7 +92,7 @@ static vm::runtime::Type to_type(byte id)
     case 0x04:
         return vm::runtime::Type::ARRAY;
     default:
-        throw std::invalid_argument("Unknown type byte");
+        throw std::invalid_argument("Unknown type byte" + std::to_string(id));
     }
 }
 
