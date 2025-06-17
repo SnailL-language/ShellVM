@@ -31,6 +31,11 @@ add_executable(
     allocator_tests.cpp
 )
 
+add_executable(
+    link_tests
+    link_tests.cpp
+)
+
 add_custom_command(TARGET reader_tests PRE_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
                         ${PROJECT_SOURCE_DIR}/test/test_data/ $<TARGET_FILE_DIR:reader_tests>/test_data)
@@ -40,3 +45,4 @@ include(GoogleTest)
 gtest_discover_tests(reader_tests)
 gtest_discover_tests(object_tests)
 gtest_discover_tests(allocator_tests)
+gtest_discover_tests(link_tests)

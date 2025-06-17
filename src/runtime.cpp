@@ -1,11 +1,17 @@
 #include "vm.hpp"
-
+#include <iostream>
 using namespace vm::runtime;
 
 Object::Object(Type type, byte *data, std::size_t data_size) 
-    : type(type), data(new byte[data_size]), data_size(data_size), links(0)
+    : type(type), data(nullptr), data_size(data_size), links(0)
 {
-    std::copy(data, data + data_size, this->data);
+    if (type == Type::ARRAY) {
+        this->data = new byte[data_size * sizeof(Link)];
+        new (this->data) Link[data_size];
+    } else {
+        this->data = new byte[data_size];
+        std::copy(data, data + data_size, this->data);
+    }
 }
 
 bool vm::runtime::Object::operator==(const Object &other) const
@@ -26,7 +32,7 @@ bool vm::runtime::Object::operator<=(const Object &other) const
     case runtime::Type::I32:
         return static_cast<int>(*this) <= static_cast<int>(other);
     case runtime::Type::USIZE:
-        return static_cast<std::size_t>(*this) <= static_cast<std::size_t>(other);
+        return static_cast<u32>(*this) <= static_cast<u32>(other);
     default:
         return static_cast<std::string>(*this) <= static_cast<std::string>(other);
     }
@@ -38,7 +44,7 @@ bool vm::runtime::Object::operator>=(const Object &other) const
     case runtime::Type::I32:
         return static_cast<int>(*this) >= static_cast<int>(other);
     case runtime::Type::USIZE:
-        return static_cast<std::size_t>(*this) >= static_cast<std::size_t>(other);
+        return static_cast<u32>(*this) >= static_cast<u32>(other);
     default:
         return static_cast<std::string>(*this) >= static_cast<std::string>(other);
     }
@@ -68,9 +74,9 @@ vm::runtime::Object::operator int() const
     return reinterpret_cast<int *>(data)[0];
 }
 
-vm::runtime::Object::operator std::size_t() const
+vm::runtime::Object::operator u32() const
 {
-    return reinterpret_cast<std::size_t *>(data)[0];
+    return reinterpret_cast<u32 *>(data)[0];
 }
 
 vm::runtime::Object::operator std::string() const
@@ -81,20 +87,42 @@ vm::runtime::Object::operator std::string() const
     case Type::I32:
     {
         result = std::to_string(static_cast<int>(*this));
+        break;
     }
     case Type::USIZE:
     {
-        result = std::to_string(static_cast<std::size_t>(*this));
+        result = std::to_string(static_cast<u32>(*this));
+        break;
     }
     case Type::STRING:
     {
         for (std::size_t i = 0; i < data_size; ++i) {
             result.push_back(data[i]);
         }
+        break;
+    }
+    case Type::ARRAY: 
+    {
+        result = "[";
+        for (std::size_t i = 0; i < data_size; ++i) 
+        {
+            Link *links = reinterpret_cast<Link *>(data);
+            if (i > 0) 
+                result += ", ";
+            if (links[i].object == nullptr)
+            {
+                result += "...";
+                break;
+            }
+            result += static_cast<std::string>(*(links[i].object));
+        }
+        result.push_back(']');
+        break;
     }
     default:
     {
         result = std::to_string(reinterpret_cast<std::size_t>(this));
+        break;
     }
     }
     return result;
@@ -104,6 +132,9 @@ Object::~Object()
 {
     delete[] data;
 }
+
+vm::runtime::Link::Link()
+    : object(nullptr) {}
 
 Link &vm::runtime::Link::operator=(Object *&obj)
 {
@@ -143,9 +174,6 @@ GlobalVariables &vm::runtime::GlobalVariables::operator=(GlobalVariables &&other
 GlobalVariables::~GlobalVariables()
 {
     if (variables != nullptr) {
-        for (u16 i = 0; i < size; ++i) {
-            delete variables[i].object;
-        }
         delete[] variables;
     }
 }

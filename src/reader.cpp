@@ -98,14 +98,16 @@ ConstantPool Reader::read_constants() {
         case 0x01:
         case 0x02: {
             u32 value = read_32();
-            data[i] = new runtime::Object(to_type(id), reinterpret_cast<byte *>(&value), 4);
+            byte *value_ptr = new byte[4];
+            std::copy(reinterpret_cast<byte *>(&value), reinterpret_cast<byte *>(&value) + 4, value_ptr);
+            data[i] = new runtime::Object(to_type(id), value_ptr, 4);
             break;
         }
         case 0x03: {
             u16 length = read_16();
-            byte *value = new byte[length + 2];
-            read_bytes(value + 2, length);
-            std::copy(&length, &length + 2, value);
+            byte *value = new byte[length];
+            read_bytes(value, length);
+            // std::copy(&length, &length + 1, value);
             data[i] = new runtime::Object(to_type(id), value, length);
             break;
         }
@@ -116,7 +118,7 @@ ConstantPool Reader::read_constants() {
     return {size, data};
 }
 
-vm::runtime::GlobalVariables Reader::read_globals()
+vm::runtime::GlobalVariables Reader::read_globals(memory::Allocator &allocator)
 {
     u16 size = read_16();
     vm::runtime::Link *variables = new vm::runtime::Link[size];
@@ -127,6 +129,9 @@ vm::runtime::GlobalVariables Reader::read_globals()
         byte id = read_byte();
         if (id == 0x04) {
             skip(5);
+            // u32 array_size = read_32();
+            // vm::runtime::Object *array = allocator.create(runtime::Type::ARRAY, reinterpret_cast<byte *>(new runtime::Link[array_size]), array_size);
+            // variables[i] = array;
         }
     }   
     return {size, variables};
@@ -226,7 +231,9 @@ std::size_t vm::code::Reader::get_offset() const
 
 void vm::code::Reader::set_offset(std::size_t pos)
 {
+    _input.clear();
     _input.seekg(pos, std::ios_base::beg);
+    _pos = _limit;
     refill_buffer();
     _absolute_pos = pos;
 }

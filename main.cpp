@@ -18,6 +18,10 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    bool debug_mode = false;
+    if (argc > 2 && (!std::strcmp("-d", argv[1]) || !strcmp("--debug", argv[1])))
+        debug_mode = true;
+
     fs::path target(argv[argc - 1]);
     
     if (!fs::exists(target)) {
@@ -25,5 +29,5 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    vm::process(target);
+    vm::process(target, debug_mode);
 }

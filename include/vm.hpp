@@ -14,7 +14,7 @@ typedef std::uint32_t u32;
 
 namespace vm {
     
-void process(const fs::path &);
+void process(const fs::path &, bool);
 
 namespace runtime {
 
@@ -27,7 +27,7 @@ private:
     std::string message;
 };
 
-enum class Type {
+enum Type : byte {
     VOID = 0x00, 
     I32 = 0x01, 
     USIZE = 0x02, 
@@ -58,7 +58,7 @@ struct Object {
 
     explicit operator bool() const;
     explicit operator int() const;
-    explicit operator std::size_t() const;
+    explicit operator u32() const;
     explicit operator std::string() const;
 
     ~Object();
@@ -67,6 +67,13 @@ struct Object {
 struct Link {
     Object *object = nullptr;
 
+    Link();
+    Link(const Link &) = delete;
+    Link(Link &&) = delete;
+
+
+    Link &operator=(const Link &) = delete;
+    Link &operator=(Link &&) = delete;
     Link &operator=(Object *&);
 
     ~Link();
@@ -95,7 +102,7 @@ class Allocator
 public: 
     Allocator() = default;
     Allocator(const Allocator &) = delete;
-    Allocator(Allocator &&) = delete;
+    Allocator(Allocator &&) = default;
 
     Allocator &operator=(const Allocator &) = delete;
     Allocator &operator=(Allocator &&) = delete;
@@ -198,7 +205,7 @@ public:
 
     Header read_header();
     ConstantPool read_constants();
-    runtime::GlobalVariables read_globals();
+    runtime::GlobalVariables read_globals(memory::Allocator &);
     FunctionTable read_functions();
     IntrinsicTable read_intrinsics();
 
