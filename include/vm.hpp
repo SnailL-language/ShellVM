@@ -6,6 +6,7 @@
 #include <functional>
 #include <cstdint>
 #include <vector>
+#include <stack>
 
 namespace fs = std::filesystem;
 
