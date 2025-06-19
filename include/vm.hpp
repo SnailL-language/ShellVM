@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <functional>
 #include <cstdint>
 #include <vector>
 
@@ -14,9 +15,6 @@ typedef std::uint32_t u32;
 
 namespace vm
 {
-
-    void process(const fs::path &, bool);
-
     namespace runtime
     {
 
@@ -131,6 +129,47 @@ namespace vm
     namespace code
     {
 
+        enum Command : byte
+        {
+            PUSH_CONST = 0x01,
+            PUSH_LOCAL = 0x02,
+            PUSH_GLOBAL = 0x03,
+            STORE_LOCAL = 0x04,
+            STORE_GLOBAL = 0x05,
+            POP = 0x06,
+            DUP = 0x07,
+
+            ADD = 0x10,
+            SUB = 0x11,
+            MUL = 0x12,
+            DIV = 0x13,
+            MOD = 0x14,
+
+            EQ = 0x20,
+            NEQ = 0x21,
+            LT = 0x22,
+            LE = 0x23,
+            GT = 0x24,
+            GTE = 0x25,
+            AND = 0x26,
+            OR = 0x27,
+            NOT = 0x28,
+
+            JMP = 0x30,
+            JMP_IF_FALSE = 0x31,
+            JMP_IF_TRUE = 0x35,
+            CALL = 0x32,
+            RET = 0x33,
+            HALT = 0x34,
+
+            NEW_ARRAY = 0x40,
+            GET_ARRAY = 0x41,
+            SET_ARRAY = 0x42,
+            INIT_ARRAY = 0x43,
+
+            INTRINSIC_CALL = 0x50
+        };
+
         class InvalidBytecodeException
         {
         public:
@@ -170,6 +209,8 @@ namespace vm
             byte arg_count;
             u16 local_count;
             u32 length;
+            std::size_t calls = 0;
+            void *compiled = nullptr;
         };
 
         struct FunctionTable
@@ -253,6 +294,118 @@ namespace vm
 
             void refill_buffer();
         };
+
+    }
+
+    struct Environment
+    {
+        memory::Allocator allocator;
+        code::Header header;
+        code::ConstantPool constant_pool;
+        runtime::GlobalVariables global;
+        code::FunctionTable functions;
+        code::IntrinsicTable intrinsics;
+        std::stack<runtime::Object *> stack;
+
+        Environment(
+            memory::Allocator &allocator,
+            code::Header &&header,
+            code::ConstantPool &&pool,
+            runtime::GlobalVariables &&global,
+            code::FunctionTable &&functions,
+            code::IntrinsicTable &&intrinsics);
+    };
+
+    void process(const fs::path &, bool);
+
+    void process(code::Reader &reader, Environment &env, std::size_t, std::size_t, bool);
+
+    namespace jit
+    {
+        void compile_func(code::Reader &, int, code::Function &, bool);
+    }
+
+    namespace proccess
+    {
+
+        using jit_function = void(code::Reader &reader,
+                                  Environment &env,
+                                  std::function<void(runtime::Object *)> push,
+                                  std::function<void()> pop,
+                                  std::function<void(const char *, std::function<int(int &&, int &&)>, std::function<u32(u32 &&, u32 &&)>, std::function<std::string(std::string &&, std::string &&)>)> arithmetic_operation,
+                                  std::function<void(const char *, std::function<bool(int &&, int &&)>, std::function<bool(u32 &&, u32 &&)>)> compare_operation,
+                                  std::function<void(const char *, std::function<bool(bool &&, bool &&)>)> logical_operation,
+                                  bool debug_mode);
+
+        void call_intrinsic(u16, Environment &, bool);
+
+        template <typename T>
+        inline std::function<T(T &&, T &&)> get_arithmetic_function(byte command)
+        {
+            switch (command)
+            {
+            case code::Command::ADD:
+                return [](T &&a, T &&b)
+                { return a + b; };
+            case code::Command::SUB:
+                return [](T &&a, T &&b)
+                { return a - b; };
+            case code::Command::MUL:
+                return [](T &&a, T &&b)
+                { return a * b; };
+            case code::Command::DIV:
+                return [](T &&a, T &&b)
+                { return a / b; };
+            case code::Command::MOD:
+                return [](T &&a, T &&b)
+                { return a % b; };
+            default:
+                throw code::InvalidBytecodeException("Invalid arithmetic command");
+            }
+        }
+
+        template <typename T>
+        inline std::function<bool(T &&, T &&)> get_comparison_function(byte command)
+        {
+            switch (command)
+            {
+            case code::Command::EQ:
+                return [](T &&a, T &&b)
+                { return a == b; };
+            case code::Command::NEQ:
+                return [](T &&a, T &&b)
+                { return a != b; };
+            case code::Command::LT:
+                return [](T &&a, T &&b)
+                { return a < b; };
+            case code::Command::LE:
+                return [](T &&a, T &&b)
+                { return a <= b; };
+            case code::Command::GT:
+                return [](T &&a, T &&b)
+                { return a > b; };
+            case code::Command::GTE:
+                return [](T &&a, T &&b)
+                { return a >= b; };
+            default:
+                throw code::InvalidBytecodeException("Invalid comparison command");
+            }
+        }
+
+        inline std::function<bool(bool &&, bool &&)> get_logical_function(byte command)
+        {
+            switch (command)
+            {
+            case code::Command::AND:
+                return [](bool &&a, bool &&b)
+                { return a && b; };
+            case code::Command::OR:
+                return [](bool &&a, bool &&b)
+                { return a || b; };
+            default:
+                throw code::InvalidBytecodeException("Invalid logical command");
+            }
+        }
 
     }
 

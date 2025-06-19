@@ -189,3 +189,14 @@ GlobalVariables::~GlobalVariables()
         delete[] variables;
     }
 }
+
+vm::Environment::Environment(
+    memory::Allocator &allocator,
+    code::Header &&header,
+    code::ConstantPool &&pool,
+    runtime::GlobalVariables &&global,
+    code::FunctionTable &&functions,
+    code::IntrinsicTable &&intrinsics)
+    : allocator(std::move(allocator)), header(std::move(header)), constant_pool(std::move(pool)), global(std::move(global)), functions(std::move(functions)), intrinsics(std::move(intrinsics))
+{
+}

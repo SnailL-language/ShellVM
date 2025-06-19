@@ -6,6 +6,7 @@
 #include <functional>
 
 using namespace vm;
+using Command = vm::code::Command;
 
 static code::Header parse_header(code::Reader &reader)
 {
@@ -24,75 +25,13 @@ static code::Header parse_header(code::Reader &reader)
     return header;
 }
 
-struct Environment
-{
-    memory::Allocator allocator;
-    code::Header header;
-    code::ConstantPool constant_pool;
-    runtime::GlobalVariables global;
-    code::FunctionTable functions;
-    code::IntrinsicTable intrinsics;
-    std::stack<runtime::Object *> stack;
-
-    Environment(
-        memory::Allocator &allocator,
-        code::Header &&header,
-        code::ConstantPool &&pool,
-        runtime::GlobalVariables &&global,
-        code::FunctionTable &&functions,
-        code::IntrinsicTable &&intrinsics)
-        : allocator(std::move(allocator)), header(std::move(header)), constant_pool(std::move(pool)), global(std::move(global)), functions(std::move(functions)), intrinsics(std::move(intrinsics))
-    {
-    }
-};
-
-enum Command : byte
-{
-    PUSH_CONST = 0x01,
-    PUSH_LOCAL = 0x02,
-    PUSH_GLOBAL = 0x03,
-    STORE_LOCAL = 0x04,
-    STORE_GLOBAL = 0x05,
-    POP = 0x06,
-    DUP = 0x07,
-
-    ADD = 0x10,
-    SUB = 0x11,
-    MUL = 0x12,
-    DIV = 0x13,
-    MOD = 0x14,
-
-    EQ = 0x20,
-    NEQ = 0x21,
-    LT = 0x22,
-    LE = 0x23,
-    GT = 0x24,
-    GTE = 0x25,
-    AND = 0x26,
-    OR = 0x27,
-    NOT = 0x28,
-
-    JMP = 0x30,
-    JMP_IF_FALSE = 0x31,
-    JMP_IF_TRUE = 0x35,
-    CALL = 0x32,
-    RET = 0x33,
-    HALT = 0x34,
-
-    NEW_ARRAY = 0x40,
-    GET_ARRAY = 0x41,
-    SET_ARRAY = 0x42,
-    INIT_ARRAY = 0x43,
-
-    INTRINSIC_CALL = 0x50
-};
 class Intrinsic
 {
 public:
     constexpr static const char *PRINTLN = "println";
 };
 
-static void call_intrinsic(u16 index, Environment &env, bool debug_mode)
+void proccess::call_intrinsic(u16 index, Environment &env, bool debug_mode)
 {
     if (env.intrinsics.functions[index].name == Intrinsic::PRINTLN)
     {
@@ -112,75 +51,7 @@ static void call_intrinsic(u16 index, Environment &env, bool debug_mode)
     }
 }
 
-template <typename T>
-static std::function<T(T &&, T &&)> get_arithmetic_function(byte command)
-{
-    switch (command)
-    {
-    case Command::ADD:
-        return [](T &&a, T &&b)
-        { return a + b; };
-    case Command::SUB:
-        return [](T &&a, T &&b)
-        { return a - b; };
-    case Command::MUL:
-        return [](T &&a, T &&b)
-        { return a * b; };
-    case Command::DIV:
-        return [](T &&a, T &&b)
-        { return a / b; };
-    case Command::MOD:
-        return [](T &&a, T &&b)
-        { return a % b; };
-    default:
-        throw code::InvalidBytecodeException("Invalid arithmetic command");
-    }
-}
-
-template <typename T>
-static std::function<bool(T &&, T &&)> get_comparison_function(byte command)
-{
-    switch (command)
-    {
-    case Command::EQ:
-        return [](T &&a, T &&b)
-        { return a == b; };
-    case Command::NEQ:
-        return [](T &&a, T &&b)
-        { return a != b; };
-    case Command::LT:
-        return [](T &&a, T &&b)
-        { return a < b; };
-    case Command::LE:
-        return [](T &&a, T &&b)
-        { return a <= b; };
-    case Command::GT:
-        return [](T &&a, T &&b)
-        { return a > b; };
-    case Command::GTE:
-        return [](T &&a, T &&b)
-        { return a >= b; };
-    default:
-        throw code::InvalidBytecodeException("Invalid comparison command");
-    }
-}
-
-static std::function<bool(bool &&, bool &&)> get_logical_function(byte command)
-{
-    switch (command)
-    {
-    case Command::AND:
-        return [](bool &&a, bool &&b)
-        { return a && b; };
-    case Command::OR:
-        return [](bool &&a, bool &&b)
-        { return a || b; };
-    default:
-        throw code::InvalidBytecodeException("Invalid logical command");
-    }
-}
-
-static void process(code::Reader &reader, Environment &env, std::size_t length, std::size_t local_count, bool debug_mode)
+void vm::process(code::Reader &reader, Environment &env, std::size_t length, std::size_t local_count, bool debug_mode)
 {
     auto push = [&env](runtime::Object *obj)
     {
@@ -280,7 +151,7 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
         runtime::Object *condition_obj = env.stack.top();
         pop();
         if (debug_mode)
-            std::cout << "JUMP_IF " << (condition ? "TRUE" : "FALSE") << " to " << length << std::endl;
+            std::cout << "JUMP_IF_" << (condition ? "TRUE" : "FALSE") << " to " << length << std::endl;
         if (condition == static_cast<bool>(*condition_obj))
             reader.set_offset(reader.get_offset() + length);
     };
@@ -348,8 +219,8 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
                                               : command == Command::MUL   ? "MUL"
                                               : command == Command::DIV   ? "DIV"
                                                                           : "MOD",
-                get_arithmetic_function<int>(command),
-                get_arithmetic_function<u32>(command),
+                proccess::get_arithmetic_function<int>(command),
+                proccess::get_arithmetic_function<u32>(command),
                 [](std::string &&a, std::string &&b)
                 { return a + b; });
             break;
@@ -368,22 +239,17 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
                                             : command == Command::LE    ? "LE"
                                             : command == Command::GT    ? "GT"
                                                                         : "GTE",
-                get_comparison_function<int>(command),
-                get_comparison_function<u32>(command));
+                proccess::get_comparison_function<int>(command),
+                proccess::get_comparison_function<u32>(command));
             break;
         }
         case Command::AND:
         case Command::OR:
         {
             logical_operation(
-                command == Command::EQ ? "EQ" : command == Command::NEQ ? "NEQ"
-                                            : command == Command::LT    ? "LT"
-                                            : command == Command::LE    ? "LE"
-                                            : command == Command::GT    ? "GT"
-                                            : command == Command::GTE   ? "GTE"
-                                            : command == Command::AND   ? "AND"
-                                                                        : "OR",
-                get_logical_function(command));
+                command == Command::AND ? "AND"
+                                        : "OR",
+                proccess::get_logical_function(command));
             break;
         }
         case Command::NOT:
@@ -414,13 +280,28 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
         case Command::CALL:
         {
             u16 index = reader.read_16();
-            std::size_t current_addr = reader.get_offset();
-            code::Function func = env.functions.functions[index];
+            code::Function &func = env.functions.functions[index];
             if (debug_mode)
-                std::cout << "CALL of " << index << " on offset " << reader.get_offset() << " to offset " << func.offset << std::endl;
-            reader.set_offset(func.offset);
-            process(reader, env, func.length, func.local_count + func.arg_count, debug_mode);
-            reader.set_offset(current_addr);
+                std::cout << "CALL of " << index << std::endl;
+            if (func.calls++ > 100)
+            {
+                if (func.compiled == nullptr)
+                {
+                    std::size_t current_addr = reader.get_offset();
+                    reader.set_offset(func.offset);
+                    jit::compile_func(reader, index, func, debug_mode);
+                    reader.set_offset(current_addr);
+                }
+
+                reinterpret_cast<proccess::jit_function *>(func.compiled)(reader, env, push, pop, arithmetic_operation, compare_operation, logical_operation, debug_mode);
+            }
+            else
+            {
+                std::size_t current_addr = reader.get_offset();
+                reader.set_offset(func.offset);
+                process(reader, env, func.length, func.local_count + func.arg_count, debug_mode);
+                reader.set_offset(current_addr);
+            }
             break;
         }
         case Command::RET:
@@ -495,7 +376,7 @@ static void process(code::Reader &reader, Environment &env, std::size_t length, 
             u16 index = reader.read_16();
             if (debug_mode)
                 std::cout << "INTRINSIC_CALL of " << index << std::endl;
-            call_intrinsic(index, env, debug_mode);
+            proccess::call_intrinsic(index, env, debug_mode);
             break;
         }
         }
