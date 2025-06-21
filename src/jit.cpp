@@ -33,7 +33,7 @@ static void write_header(std::ofstream &source, const std::string &func_name)
 
 void jit::compile_func(code::Reader &reader, int id, code::Function &function, bool debug_mode)
 {
-    std::string source_path = std::filesystem::temp_directory_path().append("jit_func").string();
+    std::string source_path = std::filesystem::temp_directory_path().append("jit_func_").string().append(std::to_string(id));
     std::ofstream source(source_path + ".cpp", std::ios::trunc);
     if (!debug_mode)
         std::cout << "Write code to " << source_path << std::endl;

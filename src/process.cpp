@@ -283,25 +283,23 @@ void vm::process(code::Reader &reader, Environment &env, std::size_t length, std
             code::Function &func = env.functions.functions[index];
             if (debug_mode)
                 std::cout << "CALL of " << index << std::endl;
+            std::size_t current_addr = reader.get_offset();
             if (func.calls++ > 100)
             {
                 if (func.compiled == nullptr)
                 {
-                    std::size_t current_addr = reader.get_offset();
                     reader.set_offset(func.offset);
                     jit::compile_func(reader, index, func, debug_mode);
-                    reader.set_offset(current_addr);
                 }
 
                 reinterpret_cast<proccess::jit_function *>(func.compiled)(reader, env, push, pop, arithmetic_operation, compare_operation, logical_operation, debug_mode);
             }
             else
             {
-                std::size_t current_addr = reader.get_offset();
                 reader.set_offset(func.offset);
                 process(reader, env, func.length, func.local_count + func.arg_count, debug_mode);
-                reader.set_offset(current_addr);
             }
+            reader.set_offset(current_addr);
             break;
         }
         case Command::RET:
@@ -381,7 +379,10 @@ void vm::process(code::Reader &reader, Environment &env, std::size_t length, std
         }
         }
         if (debug_mode)
+        {
             std::cout << "Stack size: " << env.stack.size() << std::endl;
+            std::cout << "Address " << std::hex << reader.get_offset() << std::endl;
+        }
     }
 }
 
